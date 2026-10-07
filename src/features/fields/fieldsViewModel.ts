@@ -1,4 +1,5 @@
 import { defaultSample } from '../../domain/conditionEvaluator';
+import { createFieldImpactReview, planFieldChange, type FieldImpactReport } from '../../domain/fieldImpact';
 import type { FieldType, RuleField } from '../../models/ruleModel';
 import type { WorkspacePort } from '../../viewmodels/workspacePort';
 
@@ -21,31 +22,68 @@ export class FieldsViewModel {
     }, `已添加字段“${field.name}”`);
   }
 
-  updateField(fieldId: string, updates: Partial<RuleField>): void {
+  previewFieldChange(fieldId: string, next: RuleField): FieldImpactReport | null {
     const project = this.workspace.getSnapshot().project;
-    if (!project) return;
-    const fields = project.fields.map((field) => field.id === fieldId ? { ...field, ...updates } : field);
-    this.workspace.commitProject({ ...project, fields }, '字段已更新，检查结果将自动刷新');
+    return project ? planFieldChange(project, { kind: 'update', fieldId, next }) : null;
   }
 
-  removeField(fieldId: string): boolean {
+  previewFieldDelete(fieldId: string): FieldImpactReport | null {
+    const project = this.workspace.getSnapshot().project;
+    return project ? planFieldChange(project, { kind: 'delete', fieldId }) : null;
+  }
+
+  applyFieldChange(fieldId: string, next: RuleField): boolean {
+    const project = this.workspace.getSnapshot().project;
+    if (!project) return false;
+    const report = this.previewFieldChange(fieldId, next);
+    if (!report) return false;
+    const review = report.entries.length ? createFieldImpactReview(report) : undefined;
+    const committed = this.workspace.commitProject({
+      ...project,
+      fields: project.fields.map((field) => field.id === fieldId ? structuredClone(next) : field),
+      fieldImpactReviews: review ? [review, ...project.fieldImpactReviews] : project.fieldImpactReviews,
+    }, this.changeNotice(report));
+    return committed;
+  }
+
+  updateField(fieldId: string, updates: Partial<RuleField>): boolean {
     const project = this.workspace.getSnapshot().project;
     const field = project?.fields.find((candidate) => candidate.id === fieldId);
     if (!project || !field) return false;
-    const references = project.rules.filter((rule) => referencesField(rule.conditions, fieldId)).map((rule) => rule.name);
-    if (references.length) {
-      this.workspace.updateView({ notice: `无法删除“${field.name}”：仍被 ${references.join('、')} 引用。请先移除这些规则条件。` });
-      return false;
-    }
+    return this.applyFieldChange(fieldId, { ...field, ...updates });
+  }
+
+  applyFieldDelete(fieldId: string): boolean {
+    const project = this.workspace.getSnapshot().project;
+    if (!project) return false;
+    const report = this.previewFieldDelete(fieldId);
+    if (!report) return false;
+    const review = createFieldImpactReview(report);
     const sampleInputs = { ...project.sampleInputs };
     delete sampleInputs[fieldId];
-    this.workspace.commitProject({ ...project, fields: project.fields.filter((candidate) => candidate.id !== fieldId), sampleInputs }, `已删除字段“${field.name}”`);
-    return true;
+    const committed = this.workspace.commitProject({
+      ...project,
+      fields: project.fields.filter((field) => field.id !== fieldId),
+      sampleInputs,
+      fieldImpactReviews: [review, ...project.fieldImpactReviews],
+    }, this.changeNotice(report));
+    if (committed && report.entries.length) this.workspace.navigate('rules');
+    return committed;
+  }
+
+  removeField(fieldId: string): boolean {
+    return this.applyFieldDelete(fieldId);
   }
 
   isReferenced(fieldId: string): boolean {
     const project = this.workspace.getSnapshot().project;
     return project?.rules.some((rule) => referencesField(rule.conditions, fieldId)) ?? false;
+  }
+
+  private changeNotice(report: FieldImpactReport): string {
+    if (!report.entries.length) return report.kind === 'delete' ? '字段已删除，没有规则引用该字段' : '字段已更新，没有条件需要重新确认';
+    const action = report.kind === 'delete' ? '删除' : '调整';
+    return `已${action}字段，${report.affectedRuleCount} 条规则、${report.entries.length} 个条件需要逐条确认`;
   }
 }
 

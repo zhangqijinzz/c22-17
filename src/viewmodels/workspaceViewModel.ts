@@ -1,5 +1,7 @@
 import { evaluateSample } from '../domain/conditionEvaluator';
 import { ruleDomain } from '../domain/ruleDomain';
+import { ensureConditionIds } from '../domain/conditionIdentity';
+import { normalizeProjectForImpact } from '../domain/fieldImpact';
 import type {
   ModuleId,
   RuleAnalysis,
@@ -193,7 +195,7 @@ export class RuleWorkspaceViewModel implements WorkspacePort {
     const project = this.state.project;
     const version = project?.versions.find((candidate) => candidate.id === versionId);
     if (!project || !version) return;
-    this.replaceProject({ ...project, fields: cloneData(version.fields), rules: cloneData(version.rules), sampleInputs: cloneData(version.sampleInputs), frozenVersionId: undefined }, `已从“${version.name}”建立可编辑版本`, true, true);
+    this.replaceProject({ ...project, fields: cloneData(version.fields), rules: cloneData(version.rules), sampleInputs: cloneData(version.sampleInputs), fieldImpactReviews: [], frozenVersionId: undefined }, `已从“${version.name}”建立可编辑版本`, true, true);
     this.navigate('rules');
   }
 
@@ -204,8 +206,8 @@ export class RuleWorkspaceViewModel implements WorkspacePort {
     if (!workspace || !source || !version) return;
     const project: RuleProject = {
       id: makeId('project'), title: `${source.title} · ${version.name}副本`,
-      fields: cloneData(version.fields), rules: cloneData(version.rules), sampleInputs: cloneData(version.sampleInputs),
-      versions: [], updatedAt: Date.now(),
+      fields: cloneData(version.fields), rules: ensureConditionIds(cloneData(version.rules)), sampleInputs: cloneData(version.sampleInputs),
+      versions: [], fieldImpactReviews: [], updatedAt: Date.now(),
     };
     const next = { ...workspace, projects: [...workspace.projects, project], activeProjectId: project.id };
     const issues = ruleDomain.validateProject(project);
@@ -239,7 +241,7 @@ export class RuleWorkspaceViewModel implements WorkspacePort {
       this.updateView({ notice: '当前版本已冻结。请先从版本记录中复制一份继续编辑。' });
       return;
     }
-    const updated = { ...project, updatedAt: Date.now() };
+    const updated = normalizeProjectForImpact({ ...project, updatedAt: Date.now() });
     const next = { ...workspace, projects: workspace.projects.map((candidate) => candidate.id === updated.id ? updated : candidate) };
     const issues = ruleDomain.validateProject(updated);
     this.publish({

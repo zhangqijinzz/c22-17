@@ -1,3 +1,4 @@
+import { ensureConditionIds } from '../domain/conditionIdentity';
 import type { BusinessRule, RuleProject, RuleVersion, WorkspaceDocument } from './ruleModel';
 
 export function createDemoWorkspace(): WorkspaceDocument {
@@ -27,13 +28,14 @@ export function createDemoWorkspace(): WorkspaceDocument {
   const project: RuleProject = {
     id: 'project-membership', title: '会员权益与折扣策略', fields, rules,
     sampleInputs: { 'member-level': '金卡会员', 'cart-total': 1200, 'coupon-active': true },
-    versions: [], updatedAt: Date.now(),
+    versions: [], fieldImpactReviews: [], updatedAt: Date.now(),
   };
+  ensureConditionIds(project.rules);
   return { schemaVersion: 1, projects: [project], activeProjectId: project.id };
 }
 
 export function createBlankProject(ordinal: number): RuleProject {
-  return { id: makeId('project'), title: `未命名规则项目 ${ordinal}`, fields: [], rules: [], sampleInputs: {}, versions: [], updatedAt: Date.now() };
+  return { id: makeId('project'), title: `未命名规则项目 ${ordinal}`, fields: [], rules: [], sampleInputs: {}, versions: [], fieldImpactReviews: [], updatedAt: Date.now() };
 }
 
 export function createVersionSnapshot(project: RuleProject, name: string, frozen: boolean): RuleVersion {

@@ -16,7 +16,7 @@ const navigation: { id: ModuleId; label: string; description: string; icon: stri
 
 export default function App() {
   const [viewModels] = useState(createRuleWeaveViewModels);
-  const { workspace, fields, rules, samples, inspection } = viewModels;
+  const { workspace, fields, rules, impacts, samples, inspection } = viewModels;
   const state = useSyncExternalStore(workspace.subscribe, workspace.getSnapshot, workspace.getSnapshot);
   const project = state.project;
   const activeNavigation = navigation.find((item) => item.id === state.activeModule) ?? navigation[0];
@@ -59,8 +59,8 @@ export default function App() {
             }}><span className="module-tab-icon">{item.icon}</span><span>{item.label}</span><small>{item.step}</small></button>)}
           </div>
           <div id="module-panel" className="module-tab-panel" role="tabpanel" aria-labelledby={`module-tab-${state.activeModule}`}>
-            {state.activeModule === 'fields' && <FieldsView state={state} viewModel={fields} />}
-            {state.activeModule === 'rules' && <RulesView state={state} viewModel={rules} />}
+            {state.activeModule === 'fields' && <FieldsView state={state} viewModel={fields} impactViewModel={impacts} />}
+            {state.activeModule === 'rules' && <RulesView state={state} viewModel={rules} impactViewModel={impacts} />}
             {state.activeModule === 'samples' && <SamplesView state={state} viewModel={samples} />}
             {state.activeModule === 'inspection' && <InspectionView state={state} viewModel={inspection} onOpenRule={openRule} />}
           </div>

@@ -17,10 +17,10 @@ export interface NumberRange {
 }
 
 export type PredicateCondition =
-  | { kind: 'predicate'; fieldId: string; operator: 'eq' | 'gt' | 'gte' | 'lt' | 'lte'; value: number }
-  | { kind: 'predicate'; fieldId: string; operator: 'between'; value: NumberRange }
-  | { kind: 'predicate'; fieldId: string; operator: 'eq' | 'notEq'; value: string }
-  | { kind: 'predicate'; fieldId: string; operator: 'isTrue' | 'isFalse'; value: boolean };
+  | { kind: 'predicate'; cid?: string; fieldId: string; operator: 'eq' | 'gt' | 'gte' | 'lt' | 'lte'; value: number }
+  | { kind: 'predicate'; cid?: string; fieldId: string; operator: 'between'; value: NumberRange }
+  | { kind: 'predicate'; cid?: string; fieldId: string; operator: 'eq' | 'notEq'; value: string }
+  | { kind: 'predicate'; cid?: string; fieldId: string; operator: 'isTrue' | 'isFalse'; value: boolean };
 
 export interface ConditionGroup {
   kind: 'group';
@@ -50,6 +50,38 @@ export interface RuleVersion {
   sampleInputs: SampleInput;
 }
 
+export type FieldChangeKind = 'update' | 'delete';
+export type FieldImpactSeverity = 'invalid' | 'review';
+
+export interface FieldImpactEntry {
+  id: string;
+  reviewId: string;
+  conditionId: string;
+  conditionPath: number[];
+  fieldId: string;
+  fieldName: string;
+  ruleId: string;
+  ruleName: string;
+  operator: string;
+  value: ScalarValue | NumberRange;
+  severity: FieldImpactSeverity;
+  reasonCode: string;
+  reason: string;
+  before: string;
+  after: string;
+}
+
+export interface FieldImpactReview {
+  id: string;
+  changeKind: FieldChangeKind;
+  fieldId: string;
+  fieldNameBefore: string;
+  fieldNameAfter?: string;
+  createdAt: number;
+  changeSummary: string[];
+  entries: FieldImpactEntry[];
+}
+
 export interface RuleProject {
   id: string;
   title: string;
@@ -57,6 +89,7 @@ export interface RuleProject {
   rules: BusinessRule[];
   sampleInputs: SampleInput;
   versions: RuleVersion[];
+  fieldImpactReviews: FieldImpactReview[];
   frozenVersionId?: string;
   updatedAt: number;
 }
@@ -72,6 +105,8 @@ export interface ValidationIssue {
   message: string;
   fieldId?: string;
   ruleId?: string;
+  conditionId?: string;
+  conditionPath?: number[];
 }
 
 export interface MatchWitness {

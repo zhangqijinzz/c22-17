@@ -1,5 +1,6 @@
 import type { BusinessRule, RuleField, RuleProject, RuleVersion, WorkspaceDocument } from '../models/ruleModel';
 import { defaultSample } from '../domain/conditionEvaluator';
+import { normalizeProjectForImpact } from '../domain/fieldImpact';
 import { ProjectStorageService } from '../services/projectStorageService';
 
 export class RuleRepository {
@@ -35,17 +36,50 @@ function decodeProject(value: unknown): RuleProject | null {
   const versionsValue = Array.isArray(value.versions) ? value.versions : [];
   const versions = versionsValue.filter(isRuleVersion);
   if (versions.length !== versionsValue.length) return null;
-  const project: RuleProject = {
+  const project: RuleProject = normalizeProjectForImpact({
     id: value.id,
     title: value.title,
     fields,
     rules,
     sampleInputs: isRecord(value.sampleInputs) ? value.sampleInputs as RuleProject['sampleInputs'] : defaultSample(fields),
     versions,
+    fieldImpactReviews: Array.isArray(value.fieldImpactReviews) ? value.fieldImpactReviews.filter(isFieldImpactReview) : [],
     updatedAt: value.updatedAt,
-  };
+  });
   if (typeof value.frozenVersionId === 'string') project.frozenVersionId = value.frozenVersionId;
   return project;
+}
+
+function isFieldImpactReview(value: unknown): value is RuleProject['fieldImpactReviews'][number] {
+  return isRecord(value)
+    && typeof value.id === 'string'
+    && (value.changeKind === 'update' || value.changeKind === 'delete')
+    && typeof value.fieldId === 'string'
+    && typeof value.fieldNameBefore === 'string'
+    && typeof value.createdAt === 'number'
+    && Array.isArray(value.changeSummary)
+    && value.changeSummary.every((item) => typeof item === 'string')
+    && Array.isArray(value.entries)
+    && value.entries.every(isFieldImpactEntry);
+}
+
+function isFieldImpactEntry(value: unknown): boolean {
+  return isRecord(value)
+    && typeof value.id === 'string'
+    && typeof value.reviewId === 'string'
+    && typeof value.conditionId === 'string'
+    && Array.isArray(value.conditionPath)
+    && value.conditionPath.every((item) => typeof item === 'number')
+    && typeof value.fieldId === 'string'
+    && typeof value.fieldName === 'string'
+    && typeof value.ruleId === 'string'
+    && typeof value.ruleName === 'string'
+    && typeof value.operator === 'string'
+    && (value.severity === 'invalid' || value.severity === 'review')
+    && typeof value.reasonCode === 'string'
+    && typeof value.reason === 'string'
+    && typeof value.before === 'string'
+    && typeof value.after === 'string';
 }
 
 function isRuleField(value: unknown): value is RuleField {

@@ -1,3 +1,4 @@
+import { newConditionId } from '../../domain/conditionIdentity';
 import type { BusinessRule, ConditionGroup, PredicateCondition, RuleField, RuleProject } from '../../models/ruleModel';
 import type { WorkspacePort } from '../../viewmodels/workspacePort';
 
@@ -13,7 +14,7 @@ export class RulesViewModel {
     if (!project) return;
     const ordinal = project.rules.length + 1;
     const field = project.fields.find((candidate) => candidate.type === 'number' || candidate.type === 'enum' || candidate.type === 'boolean');
-    const conditions: ConditionGroup = { kind: 'group', operator: 'and', conditions: field ? [defaultCondition(field)] : [] };
+    const conditions: ConditionGroup = { kind: 'group', operator: 'and', conditions: field ? [defaultCondition(field, newConditionId())] : [] };
     const rule: BusinessRule = { id: makeId('rule'), name: `新规则 ${ordinal}`, conditions, priority: ordinal * 10, result: '' };
     this.workspace.commitProject({ ...project, rules: [...project.rules, rule] }, `已创建“${rule.name}”`);
     this.workspace.selectRule(rule.id);
@@ -43,7 +44,7 @@ export class RulesViewModel {
       return;
     }
     this.updateRules((rule) => rule.id === ruleId
-      ? { ...rule, conditions: { ...rule.conditions, conditions: [...rule.conditions.conditions, defaultCondition(field)] } }
+      ? { ...rule, conditions: { ...rule.conditions, conditions: [...rule.conditions.conditions, defaultCondition(field, newConditionId())] } }
       : rule, '已添加一个条件');
   }
 
@@ -57,8 +58,10 @@ export class RulesViewModel {
   }
 
   changeConditionField(ruleId: string, index: number, fieldId: string): void {
-    const field = this.currentProject()?.fields.find((candidate) => candidate.id === fieldId);
-    if (field) this.updateCondition(ruleId, index, defaultCondition(field));
+    const project = this.currentProject();
+    const field = project?.fields.find((candidate) => candidate.id === fieldId);
+    const current = project?.rules.find((rule) => rule.id === ruleId)?.conditions.conditions[index];
+    if (field && current?.kind === 'predicate') this.updateCondition(ruleId, index, defaultCondition(field, current.cid ?? newConditionId()));
   }
 
   removeCondition(ruleId: string, index: number): void {
@@ -81,10 +84,10 @@ export class RulesViewModel {
   }
 }
 
-function defaultCondition(field: RuleField): PredicateCondition {
-  if (field.type === 'number') return { kind: 'predicate', fieldId: field.id, operator: 'gte', value: field.min ?? 0 };
-  if (field.type === 'enum') return { kind: 'predicate', fieldId: field.id, operator: 'eq', value: field.enumValues?.[0] ?? '' };
-  return { kind: 'predicate', fieldId: field.id, operator: 'isTrue', value: true };
+function defaultCondition(field: RuleField, cid: string): PredicateCondition {
+  if (field.type === 'number') return { kind: 'predicate', cid, fieldId: field.id, operator: 'gte', value: field.min ?? 0 };
+  if (field.type === 'enum') return { kind: 'predicate', cid, fieldId: field.id, operator: 'eq', value: field.enumValues?.[0] ?? '' };
+  return { kind: 'predicate', cid, fieldId: field.id, operator: 'isTrue', value: true };
 }
 
 function makeId(prefix: string): string {
