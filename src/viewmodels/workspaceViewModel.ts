@@ -1,4 +1,5 @@
 import { evaluateSample } from '../domain/conditionEvaluator';
+import { reconcileImpactReviews } from '../domain/fieldImpact';
 import { ruleDomain } from '../domain/ruleDomain';
 import type {
   ModuleId,
@@ -193,7 +194,7 @@ export class RuleWorkspaceViewModel implements WorkspacePort {
     const project = this.state.project;
     const version = project?.versions.find((candidate) => candidate.id === versionId);
     if (!project || !version) return;
-    this.replaceProject({ ...project, fields: cloneData(version.fields), rules: cloneData(version.rules), sampleInputs: cloneData(version.sampleInputs), frozenVersionId: undefined }, `已从“${version.name}”建立可编辑版本`, true, true);
+    this.replaceProject({ ...project, fields: cloneData(version.fields), rules: cloneData(version.rules), sampleInputs: cloneData(version.sampleInputs), impactReviews: [], frozenVersionId: undefined }, `已从“${version.name}”建立可编辑版本`, true, true);
     this.navigate('rules');
   }
 
@@ -240,18 +241,20 @@ export class RuleWorkspaceViewModel implements WorkspacePort {
       return;
     }
     const updated = { ...project, updatedAt: Date.now() };
-    const next = { ...workspace, projects: workspace.projects.map((candidate) => candidate.id === updated.id ? updated : candidate) };
-    const issues = ruleDomain.validateProject(updated);
+    const reconciled = reconcileImpactReviews(updated);
+    const finalProject = reconciled === updated.impactReviews ? updated : { ...updated, impactReviews: reconciled };
+    const finalWorkspace = { ...workspace, projects: workspace.projects.map((candidate) => candidate.id === finalProject.id ? finalProject : candidate) };
+    const issues = ruleDomain.validateProject(finalProject);
     this.publish({
-      ...this.state, workspace: next, project: updated,
+      ...this.state, workspace: finalWorkspace, project: finalProject,
       phase: issues.length ? 'validating' : 'editing', validationIssues: issues,
       checkStatus: issues.length ? 'idle' : recheck ? 'scheduled' : this.state.checkStatus,
       analysis: recheck ? null : this.state.analysis,
-      sampleEvaluation: evaluateSample(updated, updated.sampleInputs),
-      selectedRuleId: updated.rules.some((rule) => rule.id === this.state.selectedRuleId) ? this.state.selectedRuleId : updated.rules[0]?.id,
+      sampleEvaluation: evaluateSample(finalProject, finalProject.sampleInputs),
+      selectedRuleId: finalProject.rules.some((rule) => rule.id === this.state.selectedRuleId) ? this.state.selectedRuleId : finalProject.rules[0]?.id,
       notice,
     });
-    this.scheduleSave(next);
+    this.scheduleSave(finalWorkspace);
     if (recheck && !issues.length) this.scheduleCheck(180);
     else if (issues.length) this.cancelPendingCheck();
   }

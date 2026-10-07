@@ -14,7 +14,7 @@ class FakeChecker {
 }
 
 describe('feature ViewModels', () => {
-  it('adds typed fields, builds a rule, protects referenced fields, and evaluates a sample', async () => {
+  it('adds typed fields, builds a rule, records full deletion impact, and evaluates a sample', async () => {
     const workspace = new RuleWorkspaceViewModel(new MemoryRepository(), new FakeChecker());
     await workspace.start();
     const fields = new FieldsViewModel(workspace);
@@ -24,8 +24,10 @@ describe('feature ViewModels', () => {
     rules.addRule();
     const addedField = workspace.getSnapshot().project?.fields.at(-1);
     expect(addedField?.type).toBe('boolean');
-    expect(fields.removeField('member-level')).toBe(false);
-    expect(workspace.getSnapshot().notice).toContain('仍被');
+    const deletionReport = fields.removeField('member-level');
+    expect(deletionReport?.counts.conditions).toBe(3);
+    expect(workspace.getSnapshot().project?.fields.some((field) => field.id === 'member-level')).toBe(false);
+    expect(workspace.getSnapshot().project?.impactReviews?.[0]?.conditions).toHaveLength(3);
     const project = workspace.getSnapshot().project;
     expect(project).toBeDefined();
     const boolField = project?.fields.at(-1);

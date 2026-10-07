@@ -6,6 +6,7 @@ import { SamplesView } from './features/samples/SamplesView';
 import { InspectionView } from './features/inspection/InspectionView';
 import { createRuleWeaveViewModels } from './viewmodels/createRuleWeaveViewModels';
 import './styles.css';
+import './features/impact/impact.css';
 
 const navigation: { id: ModuleId; label: string; description: string; icon: string; step: string }[] = [
   { id: 'fields', label: '字段定义', description: '输入与合法范围', icon: '▤', step: '01' },
@@ -16,7 +17,7 @@ const navigation: { id: ModuleId; label: string; description: string; icon: stri
 
 export default function App() {
   const [viewModels] = useState(createRuleWeaveViewModels);
-  const { workspace, fields, rules, samples, inspection } = viewModels;
+  const { workspace, fields, rules, samples, inspection, impact } = viewModels;
   const state = useSyncExternalStore(workspace.subscribe, workspace.getSnapshot, workspace.getSnapshot);
   const project = state.project;
   const activeNavigation = navigation.find((item) => item.id === state.activeModule) ?? navigation[0];
@@ -59,8 +60,8 @@ export default function App() {
             }}><span className="module-tab-icon">{item.icon}</span><span>{item.label}</span><small>{item.step}</small></button>)}
           </div>
           <div id="module-panel" className="module-tab-panel" role="tabpanel" aria-labelledby={`module-tab-${state.activeModule}`}>
-            {state.activeModule === 'fields' && <FieldsView state={state} viewModel={fields} />}
-            {state.activeModule === 'rules' && <RulesView state={state} viewModel={rules} />}
+            {state.activeModule === 'fields' && <FieldsView state={state} viewModel={fields} impactViewModel={impact} />}
+            {state.activeModule === 'rules' && <RulesView state={state} viewModel={rules} impactViewModel={impact} />}
             {state.activeModule === 'samples' && <SamplesView state={state} viewModel={samples} />}
             {state.activeModule === 'inspection' && <InspectionView state={state} viewModel={inspection} onOpenRule={openRule} />}
           </div>

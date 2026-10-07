@@ -22,6 +22,73 @@ export type PredicateCondition =
   | { kind: 'predicate'; fieldId: string; operator: 'eq' | 'notEq'; value: string }
   | { kind: 'predicate'; fieldId: string; operator: 'isTrue' | 'isFalse'; value: boolean };
 
+export type ImpactSeverity = 'info' | 'warning' | 'invalid';
+export type ImpactConditionState =
+  | 'reference-only'
+  | 'scope-changed'
+  | 'always-true'
+  | 'impossible'
+  | 'scope-partial'
+  | 'invalid-value'
+  | 'field-deleted';
+
+export interface ImpactChange {
+  key: string;
+  label: string;
+  before: string;
+  after: string;
+}
+
+export interface ImpactedCondition {
+  ruleId: string;
+  ruleName: string;
+  path: number[];
+  fieldId: string;
+  fieldName: string;
+  operator: PredicateCondition['operator'];
+  valueText: string;
+  state: ImpactConditionState;
+  severity: ImpactSeverity;
+  reason: string;
+  signature: string;
+}
+
+export interface ImpactedRuleSummary {
+  ruleId: string;
+  ruleName: string;
+  conditionCount: number;
+  warningCount: number;
+  invalidCount: number;
+}
+
+export interface FieldImpactReport {
+  action: 'update' | 'delete';
+  fieldId: string;
+  fieldName: string;
+  nextField?: RuleField;
+  changes: ImpactChange[];
+  impactedRules: ImpactedRuleSummary[];
+  conditions: ImpactedCondition[];
+  counts: {
+    rules: number;
+    conditions: number;
+    info: number;
+    warning: number;
+    invalid: number;
+  };
+}
+
+export interface FieldImpactReview {
+  id: string;
+  fieldId: string;
+  fieldName: string;
+  action: 'update' | 'delete';
+  changedAt: number;
+  changes: ImpactChange[];
+  conditions: ImpactedCondition[];
+  acknowledgedConditionKeys: string[];
+}
+
 export interface ConditionGroup {
   kind: 'group';
   operator: 'and' | 'or';
@@ -57,6 +124,7 @@ export interface RuleProject {
   rules: BusinessRule[];
   sampleInputs: SampleInput;
   versions: RuleVersion[];
+  impactReviews?: FieldImpactReview[];
   frozenVersionId?: string;
   updatedAt: number;
 }
